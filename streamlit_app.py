@@ -83,11 +83,14 @@ def index_summary():
     if count:
         data = col.get(include=["metadatas"])
         for meta in data["metadatas"]:
-            #pid = meta.get("paper_id") or "?"
-          meta = meta or {}
-pid = meta.get("paper_id") or "?"
+            meta = meta or {}
+            pid = meta.get("paper_id") or "?"
             entry = papers.setdefault(
-                pid, {"paper_id": pid, "title": meta.get("title") or pid, "n_chunks": 0}
+                pid, {
+                    "paper_id": pid,
+                    "title": meta.get("title") or pid,
+                    "n_chunks": 0,
+                },
             )
             entry["n_chunks"] += 1
     return {"count": count, "papers": sorted(papers.values(), key=lambda p: p["title"])}

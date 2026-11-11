@@ -63,8 +63,7 @@ def hypothetical_document(question: str, retries: int = 3) -> str:
                         f"HyDE rate-limited, using the raw question only this time: {e}"
                     )
                     return ""
-
-                time.sleep(5)  # Allow headroom for the free tier's 15 req/min limit.
+                time.sleep(5)
                 continue
 
             _hyde_disabled_reason = str(e)
@@ -80,15 +79,17 @@ def hypothetical_document(question: str, retries: int = 3) -> str:
 
 
 def embed_query(question: str, use_hyde: bool = False) -> list[float]:
-    """Average the question and HyDE passage embeddings, then re-normalize for cosine search."""
+    """Average the question and HyDE passage embeddings, then re-normalize."""
     texts = [config.QUERY_INSTRUCTION + question]
     if use_hyde and (doc := hypothetical_document(question)):
         texts.append(doc)
+
     vec = np.mean(embed_texts(texts), axis=0)
     norm = np.linalg.norm(vec)
 
     if not np.isfinite(norm) or norm == 0:
         raise ValueError("Query embedding has an invalid or zero norm.")
+
     return (vec / norm).tolist()
 
 
@@ -98,13 +99,8 @@ def search(
     where: dict | None = None,
 ) -> list[dict]:
     """
-    Retrieval layer: return the k chunks closest to an already-embedded query,
-    best first.
-
-    Each result includes both "distance" and "score" set to the same cosine-distance
-    value (lower = more similar) — kept as two keys temporarily so eval_retrieval.py,
-    reviewer_agent.py, and the notebook's generation code don't all need to be patched
-    at once. Pick one name as a team and drop the other once everything's migrated.
+    Return the k chunks closest to an embedded query, best first.
+    Lower cosine distance means greater similarity.
     """
     collection = store.get_collection()
     store.check_embedding_model(collection)
@@ -126,7 +122,9 @@ def search(
         result["metadatas"][0],
         result["distances"][0],
     ):
+        meta = meta or {}
         dist_val = round(float(dist), 4)
+
         hits.append({
             "chunk_id": chunk_id,
             "paper_id": meta.get("paper_id"),
@@ -142,6 +140,7 @@ def search(
             "distance": dist_val,
             "score": dist_val,
         })
+
     return hits
 
 
@@ -151,5 +150,5 @@ def retrieve(
     use_hyde: bool = False,
     where: dict | None = None,
 ) -> list[dict]:
-    """Embed (and optionally enrich) the question, then search. Same output as search()."""
+    """Embed the question, then search."""
     return search(embed_query(question, use_hyde), k=k, where=where)

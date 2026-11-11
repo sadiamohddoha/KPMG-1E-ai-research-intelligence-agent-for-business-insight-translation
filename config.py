@@ -26,8 +26,7 @@ try:
 except (ImportError, FileNotFoundError, KeyError):
     pass
     
-#GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 #GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
 # Cloud resources: Azure OpenAI embeddings, Pinecone vector DB, and Blob Storage for PDFs.

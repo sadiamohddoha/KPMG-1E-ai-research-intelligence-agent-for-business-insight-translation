@@ -135,11 +135,18 @@ def safe_review(hits: list[dict], answer: str):
 
 
 # --- First-boot: build the index if it's empty----------------------------------------------------------------------------------------
-
 def ensure_index():
-    summary = index_summary()
-    if summary["count"] > 0:
-        return summary
+    try:
+        summary = index_summary()
+        if summary["count"] > 0:
+            col = get_collection()
+            col.query(
+                query_embeddings=[[0.0] * 768],
+                n_results=1,
+            )
+            return summary
+    except Exception:
+        refresh_index_caches()
 
     import json
     from embed import embed_texts

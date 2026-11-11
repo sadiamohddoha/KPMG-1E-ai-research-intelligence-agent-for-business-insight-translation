@@ -1,13 +1,19 @@
-
 import json
 from pathlib import Path
+import streamlit as st
 
-import config
-import store
-from embed import embed_texts
+st.title("Chunk Data Test")
 
-path = Path("chunks/chunks.jsonl")
-records = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+path = Path(__file__).parent / "chunks" / "chunks.jsonl"
 
-print("Found", len(records), "chunks")
-print("First chunk keys:", list(records[0].keys()))
+if path.exists():
+    records = [
+        json.loads(line)
+        for line in path.read_text().splitlines()
+        if line.strip()
+    ]
+    st.success(f"Found {len(records)} chunks")
+    if records:
+        st.write("First chunk keys:", list(records[0].keys()))
+else:
+    st.error("Chunk file not found")

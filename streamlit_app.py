@@ -42,6 +42,9 @@ for _key in ("GEMINI_API_KEY", "GEMINI_MODEL", "BACKEND_API_URL", "BACKEND_API_K
 # Project modules (import after env is set). We import whole modules so the
 # demo can reset their session-level "disabled" flags without touching behavior
 # for the CLI / Azure / eval scripts that never import this file.
+st.title("AI Research Intelligence Agent")
+st.success("Startup test passed before AI imports!")
+st.stop()
 import config  # noqa: E402
 import store  # noqa: E402
 import embed  # noqa: E402

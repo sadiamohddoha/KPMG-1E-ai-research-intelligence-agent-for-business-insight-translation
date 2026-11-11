@@ -27,7 +27,8 @@ if not GEMINI_API_KEY:
         GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
     except (ImportError, FileNotFoundError, KeyError):
         pass
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+#GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # Cloud resources: Azure OpenAI embeddings, Pinecone vector DB, and Blob Storage for PDFs.
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "")

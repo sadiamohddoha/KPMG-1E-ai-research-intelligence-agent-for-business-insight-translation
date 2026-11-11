@@ -1,6 +1,10 @@
+
 import time
+import logging
 
 import config
+
+logger = logging.getLogger(__name__)
 
 ANSWER_PROMPT = """You are a research analyst translating AI research papers into business insights.
 
@@ -18,7 +22,6 @@ Excerpts:
 Question: {question}"""
 
 _client = None
-_gen_disabled_reason = ""
 
 
 def _gemini():
@@ -30,24 +33,40 @@ def _gemini():
 
 
 def format_source(i: int, hit: dict) -> str:
-    pages = f"p.{hit['page_start']}" + (f"-{hit['page_end']}" if hit["page_end"] != hit["page_start"] else "")
-    return f"[{i}] {hit['title']} - {hit['section_path']} ({pages})"
+    start = hit.get("page_start", "?")
+    end = hit.get("page_end", start)
+    pages = f"p.{start}"
+    if end != start:
+        pages += f"-{end}"
+
+    return (
+        f"[{i}] {hit.get('title', 'Untitled')} - "
+        f"{hit.get('section_path', '')} ({pages})"
+    )
 
 
 def build_context(hits: list[dict]) -> str:
-    return "\n\n".join(f"{format_source(i, h)}\n{h['text']}" for i, h in enumerate(hits, 1))
+    return "\n\n".join(
+        f"{format_source(i, h)}\n{h.get('text', '')}"
+        for i, h in enumerate(hits, 1)
+    )
 
 
 def generate_answer(question: str, hits: list[dict], retries: int = 3) -> str:
-    global _gen_disabled_reason
     if not hits:
         return "No matching chunks were found in the corpus for this question."
-    if not config.GEMINI_API_KEY or _gen_disabled_reason:
-        return ""
+
+    if not config.GEMINI_API_KEY:
+        return "Gemini configuration error: GEMINI_API_KEY is missing."
+
     from google.genai import errors, types
 
     gen_config = types.GenerateContentConfig(temperature=0.2)
-    prompt = ANSWER_PROMPT.format(context=build_context(hits), question=question)
+    prompt = ANSWER_PROMPT.format(
+        context=build_context(hits),
+        question=question,
+    )
+
     for attempt in range(retries):
         try:
             resp = _gemini().models.generate_content(
@@ -55,13 +74,27 @@ def generate_answer(question: str, hits: list[dict], retries: int = 3) -> str:
                 contents=prompt,
                 config=gen_config,
             )
-            return (resp.text or "").strip()
+
+            answer = (resp.text or "").strip()
+
+            if answer:
+                return answer
+
+            logger.warning(
+                "Gemini returned no text. Model: %s; response: %s",
+                config.GEMINI_MODEL,
+                resp,
+            )
+            return "Gemini returned no text. Check Streamlit logs for response details."
+
         except errors.ServerError as e:
+            logger.exception("Gemini server error")
             if attempt == retries - 1:
-                print(f"Answer generation failed after {retries} attempts: {e}")
-                return ""
-            time.sleep(2**attempt)
+                return f"Gemini server error: {e}"
+            time.sleep(2 ** attempt)
+
         except Exception as e:
-            _gen_disabled_reason = str(e)
-            print(f"Answer generation disabled for this session: {e}")
-            return ""
+            logger.exception("Gemini answer generation failed")
+            return f"Gemini API error ({type(e).__name__}): {e}"
+
+    return "Gemini failed after all retry attempts."

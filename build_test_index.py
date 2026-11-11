@@ -37,4 +37,13 @@ if st.button("Build search index"):
     with st.spinner("Building index..."):
         count = build_index()
     st.success(f"Indexed {count} chunks!")
+st.subheader("Test search")
 
+if st.button("Test retrieval"):
+    query = "How can businesses reduce AI costs?"
+    vector = embed_texts([query])[0]
+    results = store.get_collection().query(
+        query_embeddings=[vector],
+        n_results=3,
+    )
+    st.write(results["documents"])

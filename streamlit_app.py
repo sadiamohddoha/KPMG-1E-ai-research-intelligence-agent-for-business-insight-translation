@@ -134,41 +134,40 @@ def safe_review(hits: list[dict], answer: str):
         return None, friendly_gemini_error(exc)
 
 
-# --- First-boot: build the index if it's empty------------------------------
+# --- First-boot: build the index if it's empty----------------------------------------------------------------------------------------
+
 def ensure_index():
     summary = index_summary()
-
     if summary["count"] > 0:
-        try:
-            collection = store.get_collection()
-            collection.query(
-                query_embeddings=[embed.embed_texts(["test"])[0]],
-                n_results=1,
-            )
-            return summary
-        except Exception:
-            pass
+        return summary
 
     import json
+    from embed import embed_texts
 
-    chunks_path = ROOT / "chunks" / "chunks.jsonl"
+    path = ROOT / "chunks" / "chunks.jsonl"
     records = [
         json.loads(line)
-        for line in chunks_path.read_text().splitlines()
+        for line in path.read_text().splitlines()
         if line.strip()
     ]
 
-    ids = [str(r["chunk_id"]) for r in records]
-    texts = [r["chunk_text"] for r in records]
+    if not records:
+        st.error("No chunks found.")
+        st.stop()
 
     with st.spinner("Building search index..."):
-        vectors = embed.embed_texts(texts)
         collection = store.get_collection()
-        collection.upsert(
-            ids=ids,
-            documents=texts,
-            embeddings=vectors,
-        )
+
+        batch_size = 16
+        for start in range(0, len(records), batch_size):
+            batch = records[start:start + batch_size]
+            texts = [r["chunk_text"] for r in batch]
+
+            collection.upsert(
+                ids=[str(r["chunk_id"]) for r in batch],
+                documents=texts,
+                embeddings=embed_texts(texts),
+            )
 
     refresh_index_caches()
     return index_summary()

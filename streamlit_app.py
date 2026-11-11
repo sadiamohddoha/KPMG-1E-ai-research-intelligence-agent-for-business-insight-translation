@@ -134,21 +134,14 @@ def safe_review(hits: list[dict], answer: str):
         return None, friendly_gemini_error(exc)
 
 
-# --- First-boot: build the index if it's empty ------------------------------
+# --- First-boot: build the index if it's empty------------------------------
 def ensure_index():
-    #warm_embedding_model()---------
     summary = index_summary()
     if summary["count"] > 0:
         return summary
-    with st.spinner("First run: building the search index from chunks/ … this can take 1–2 minutes."):
-        proc = subprocess.run([PY, str(ROOT / "ingest.py")], capture_output=True, text=True, cwd=str(ROOT))
-    refresh_index_caches()
-    summary = index_summary()
-    if summary["count"] == 0:
-        st.error("Could not build the index automatically.")
-        st.code((proc.stderr or proc.stdout or "")[-2000:])
-        st.stop()
-    return summary
+
+    st.error("Search index is empty. Database needs rebuilding.")
+    st.stop()
 
 
 # --- Pipeline runner (Ask tab) ----------------------------------------------

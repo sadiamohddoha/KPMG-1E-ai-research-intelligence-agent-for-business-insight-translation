@@ -18,15 +18,14 @@ QUERY_INSTRUCTION = os.getenv(
 CHROMA_DB_PATH = str(ROOT / os.getenv("CHROMA_DB_PATH", "chroma_db_test"))
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "kpmg_papers")
 
-#GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-if not GEMINI_API_KEY:
-    try:
-        import streamlit as st
-        GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
-    except (ImportError, FileNotFoundError, KeyError):
-        pass
+try:
+    import streamlit as st
+    GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", GEMINI_API_KEY)
+except (ImportError, FileNotFoundError, KeyError):
+    pass
+    
 #GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 

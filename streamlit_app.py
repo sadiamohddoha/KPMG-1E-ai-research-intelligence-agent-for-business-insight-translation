@@ -137,11 +137,42 @@ def safe_review(hits: list[dict], answer: str):
 # --- First-boot: build the index if it's empty------------------------------
 def ensure_index():
     summary = index_summary()
-    if summary["count"] > 0:
-        return summary
 
-    st.error("Search index is empty. Database needs rebuilding.")
-    st.stop()
+    if summary["count"] > 0:
+        try:
+            collection = store.get_collection()
+            collection.query(
+                query_embeddings=[embed.embed_texts(["test"])[0]],
+                n_results=1,
+            )
+            return summary
+        except Exception:
+            pass
+
+    import json
+
+    chunks_path = ROOT / "chunks" / "chunks.jsonl"
+    records = [
+        json.loads(line)
+        for line in chunks_path.read_text().splitlines()
+        if line.strip()
+    ]
+
+    ids = [str(r["chunk_id"]) for r in records]
+    texts = [r["chunk_text"] for r in records]
+
+    with st.spinner("Building search index..."):
+        vectors = embed.embed_texts(texts)
+        collection = store.get_collection()
+        collection.upsert(
+            ids=ids,
+            documents=texts,
+            embeddings=vectors,
+        )
+
+    refresh_index_caches()
+    return index_summary()
+
 
 
 # --- Pipeline runner (Ask tab) ----------------------------------------------

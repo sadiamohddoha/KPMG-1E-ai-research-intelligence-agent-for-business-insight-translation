@@ -1,10 +1,7 @@
 
-import time
 import logging
 
 import config
-
-logger = logging.getLogger(__name__)
 
 ANSWER_PROMPT = """You are a research analyst translating AI research papers into business insights.
 
@@ -21,15 +18,7 @@ Excerpts:
 
 Question: {question}"""
 
-_client = None
-
-
-def _gemini():
-    global _client
-    if _client is None:
-        from google import genai
-        _client = genai.Client(api_key=config.GEMINI_API_KEY)
-    return _client
+logger = logging.getLogger(__name__)
 
 
 def format_source(i: int, hit: dict) -> str:
@@ -52,49 +41,63 @@ def build_context(hits: list[dict]) -> str:
     )
 
 
-def generate_answer(question: str, hits: list[dict], retries: int = 3) -> str:
+def generate_answer(
+    question: str,
+    hits: list[dict],
+    retries: int = 1,
+) -> str:
+
     if not hits:
-        return "No matching chunks were found in the corpus for this question."
+        return "No matching research sources were found."
 
     if not config.GEMINI_API_KEY:
-        return "Gemini configuration error: GEMINI_API_KEY is missing."
+        return "Gemini API key is missing."
 
+    from google import genai
     from google.genai import errors, types
 
-    gen_config = types.GenerateContentConfig(temperature=0.2)
-    prompt = ANSWER_PROMPT.format(
-        context=build_context(hits),
-        question=question,
-    )
+    try:
+        client = genai.Client(
+            api_key=config.GEMINI_API_KEY,
+            http_options=types.HttpOptions(
+                timeout=30000,
+                retry_options=types.HttpRetryOptions(
+                    attempts=1
+                ),
+            ),
+        )
 
-    for attempt in range(retries):
-        try:
-            resp = _gemini().models.generate_content(
-                model=config.GEMINI_MODEL,
-                contents=prompt,
-                config=gen_config,
-            )
+        prompt = ANSWER_PROMPT.format(
+            context=build_context(hits),
+            question=question,
+        )
 
-            answer = (resp.text or "").strip()
+        response = client.models.generate_content(
+            model=config.GEMINI_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.2,
+                max_output_tokens=1024,
+            ),
+        )
 
-            if answer:
-                return answer
+        answer = (response.text or "").strip()
 
-            logger.warning(
-                "Gemini returned no text. Model: %s; response: %s",
-                config.GEMINI_MODEL,
-                resp,
-            )
-            return "Gemini returned no text. Check Streamlit logs for response details."
+        if answer:
+            return answer
 
-        except errors.ServerError as e:
-            logger.exception("Gemini server error")
-            if attempt == retries - 1:
-                return f"Gemini server error: {e}"
-            time.sleep(2 ** attempt)
+        return "Gemini returned an empty response. Please try again."
 
-        except Exception as e:
-            logger.exception("Gemini answer generation failed")
-            return f"Gemini API error ({type(e).__name__}): {e}"
+    except errors.ServerError as e:
+        logger.warning("Gemini server error: %s", e)
+        return (
+            "Gemini is temporarily overloaded (503). "
+            "Please try again in a few minutes."
+        )
 
-    return "Gemini failed after all retry attempts."
+    except Exception as e:
+        logger.exception("Gemini generation failed")
+        return (
+            f"Gemini request failed ({type(e).__name__}). "
+            "Check Streamlit logs for details."
+        )

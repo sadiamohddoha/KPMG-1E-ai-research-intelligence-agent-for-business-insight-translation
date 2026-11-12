@@ -261,16 +261,18 @@ def run_backend_pipeline(question: str, k: int, use_hyde: bool, where: dict | No
 
 
 # --- Pipeline runner (Ask tab) ----------------------------------------------
+
 def run_pipeline(question: str, k: int, use_hyde: bool, where: dict | None):
-      if os.environ.get("BACKEND_API_URL", "").strip():
+    if os.environ.get("BACKEND_API_URL", "").strip():
         return run_backend_pipeline(question, k, use_hyde, where)
-    # Clear any sticky per-session "disabled" flags so one earlier transient
-    # error doesn't silently mute generation/HyDE for the rest of the demo.
+
+    # Clear any sticky per-session "disabled" flags
     generate._gen_disabled_reason = ""
     retrieve_mod._hyde_disabled_reason = ""
 
     result: dict = {"question": question, "k": k, "use_hyde": use_hyde}
     timings: dict[str, float] = {}
+
 
     with st.status("Running the pipeline…", expanded=True) as status:
         # 1. Retrieve

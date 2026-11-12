@@ -223,16 +223,14 @@ def run_backend_pipeline(question: str, k: int, use_hyde: bool, where: dict | No
             )
 
             if not response.ok:
-                try:
-                    message = response.json().get("error", response.text)
-                except ValueError:
-                    message = response.text
+                if response.status_code == 503:
+                    status.update(
+                        label="Azure search unavailable — using local pipeline",
+                        state="complete",
+                    )
+                    return run_local_pipeline(question, k, use_hyde, where)
 
-                st.error(f"Backend response ({response.status_code}): {message[:500]}")
-                return
-
-            response.raise_for_status()
-
+                response.raise_for_status()
             data = response.json()
 
             if not isinstance(data, dict):
@@ -274,9 +272,15 @@ def run_backend_pipeline(question: str, k: int, use_hyde: bool, where: dict | No
 
 # --- Pipeline runner (Ask tab) ----------------------------------------------
 
+
 def run_pipeline(question: str, k: int, use_hyde: bool, where: dict | None):
     if os.environ.get("BACKEND_API_URL", "").strip():
         return run_backend_pipeline(question, k, use_hyde, where)
+    return run_local_pipeline(question, k, use_hyde, where)
+
+
+def run_local_pipeline(question: str, k: int, use_hyde: bool, where: dict | None):
+
 
     # Clear any sticky per-session "disabled" flags
     generate._gen_disabled_reason = ""

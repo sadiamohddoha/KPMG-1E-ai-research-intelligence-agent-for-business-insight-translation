@@ -186,8 +186,84 @@ def ensure_index():
 
 
 
+def run_backend_pipeline(question: str, k: int, use_hyde: bool, where: dict | None):
+    import requests
+
+    base_url = os.environ["BACKEND_API_URL"].strip().rstrip("/")
+    if base_url.endswith("/api"):
+        base_url = base_url[:-4]
+
+    api_key = os.environ.get("BACKEND_API_KEY", "").strip()
+
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["x-functions-key"] = api_key
+
+    payload = {
+        "question": question,
+        "k": k,
+        "use_hyde": use_hyde,
+        "mode": "answer",
+        "filters": {},
+    }
+
+    # The backend filters by paper ID, not paper title.
+    # Do not silently apply the frontend's title filter.
+    if where:
+        st.warning("Paper title filtering is not supported in Azure mode yet.")
+
+    with st.status("Calling Azure backend...", expanded=True) as status:
+        try:
+            response = requests.post(
+                f"{base_url}/api/query",
+                json=payload,
+                headers=headers,
+                timeout=120,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            if not isinstance(data, dict):
+                raise ValueError("Unexpected backend response.")
+
+            if data.get("error"):
+                raise ValueError(str(data["error"]))
+
+            backend_timings = data.get("timings") or {}
+            timings = {
+                label: float(backend_timings[key])
+                for key, label in (
+                    ("retrieve", "Retrieve"),
+                    ("generate", "Generate"),
+                    ("review", "Review"),
+                )
+                if backend_timings.get(key) is not None
+            }
+
+            st.session_state.last_result = {
+                "question": question,
+                "k": k,
+                "use_hyde": use_hyde,
+                "hits": data.get("sources") or [],
+                "answer": data.get("answer") or "",
+                "review": data.get("review"),
+                "gen_error": None,
+                "review_error": None,
+                "timings": timings,
+            }
+
+            status.update(label="Azure backend completed", state="complete")
+
+        except (requests.RequestException, ValueError, TypeError) as exc:
+            status.update(label="Azure backend failed", state="error")
+            st.error(f"Azure backend error: {exc}")
+
+
+
 # --- Pipeline runner (Ask tab) ----------------------------------------------
 def run_pipeline(question: str, k: int, use_hyde: bool, where: dict | None):
+      if os.environ.get("BACKEND_API_URL", "").strip():
+        return run_backend_pipeline(question, k, use_hyde, where)
     # Clear any sticky per-session "disabled" flags so one earlier transient
     # error doesn't silently mute generation/HyDE for the rest of the demo.
     generate._gen_disabled_reason = ""

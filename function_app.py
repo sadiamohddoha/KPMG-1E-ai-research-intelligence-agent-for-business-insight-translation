@@ -137,3 +137,32 @@ def daily_ingest(timer: func.TimerRequest) -> None:
         logging.warning("Ingestion steps aren't implemented yet; skipping this run.")
         return
     check_run(summary)  # logs the summary; raises on failed papers or an unexpectedly empty day
+
+#testing the azure api fixing error 
+
+@app.route(route="diagnostics", methods=["GET"])
+def diagnostics(req: func.HttpRequest) -> func.HttpResponse:
+    """Temporary authenticated backend connectivity test."""
+    results = {}
+
+    try:
+        from azure_embed import embed_texts
+        vector = embed_texts(["test"])
+        results["azure_embeddings"] = {
+            "status": "ok",
+            "dimensions": len(vector[0]),
+        }
+    except Exception:
+        logging.exception("Azure embedding diagnostic failed")
+        results["azure_embeddings"] = {"status": "failed"}
+
+    try:
+        from retrieve import _pinecone_index
+        index = _pinecone_index()
+        index.describe_index_stats()
+        results["pinecone"] = {"status": "ok"}
+    except Exception:
+        logging.exception("Pinecone diagnostic failed")
+        results["pinecone"] = {"status": "failed"}
+
+    return _json(results)

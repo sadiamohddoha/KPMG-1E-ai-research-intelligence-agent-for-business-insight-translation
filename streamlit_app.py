@@ -220,6 +220,14 @@ def run_backend_pipeline(question: str, k: int, use_hyde: bool, where: dict | No
                 headers=headers,
                 timeout=120,
             )
+          if not response.ok:
+    try:
+        message = response.json().get("error", response.text)
+    except ValueError:
+        message = response.text
+
+    st.error(f"Backend response ({response.status_code}): {message[:500]}")
+    return
             response.raise_for_status()
             data = response.json()
 
